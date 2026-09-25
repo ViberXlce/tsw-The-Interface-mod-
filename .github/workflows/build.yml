@@ -22,7 +22,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build mod with Gradle
-        run: gradle build --no-daemon
+        run: gradle build -Pfabric_version=0.102.0+1.21.1 --no-daemon
 
       - name: Upload built jar
         uses: actions/upload-artifact@v4
