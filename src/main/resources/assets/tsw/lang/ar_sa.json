@@ -1,0 +1,12 @@
+{
+  "tsw.screen.title": "TSW - اختر شخصيتك",
+  "tsw.slot.empty": "خانة فاضية - أنشئ شخصية جديدة",
+  "tsw.slot.select": "اختيار",
+  "tsw.slot.create": "إنشاء",
+  "tsw.slot.skinUrl": "رابط السكن",
+  "tsw.slot.slotNumber": "الخانة %s",
+  "tsw.slot.save": "حفظ السكن",
+  "tsw.msg.invalidUrl": "رابط السكن غير صالح.",
+  "tsw.msg.characterLoaded": "تم تحميل الشخصية.",
+  "tsw.msg.mustSelect": "يجب اختيار شخصية قبل اللعب."
+}

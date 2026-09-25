@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "tsw",
+  "version": "${version}",
+  "name": "TSW",
+  "description": "Custom character selection system: 3 independent character slots per player, each with its own inventory, position and stats, plus custom skins via URL and a cinematic selection screen shown on join.",
+  "authors": ["TSW"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/tsw/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.tsw.mod.TSWMod"
+    ],
+    "client": [
+      "com.tsw.mod.TSWClient"
+    ]
+  },
+  "mixins": [
+    "tsw.mixins.json",
+    {
+      "config": "tsw.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

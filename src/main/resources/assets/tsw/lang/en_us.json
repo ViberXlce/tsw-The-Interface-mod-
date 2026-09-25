@@ -1,0 +1,12 @@
+{
+  "tsw.screen.title": "TSW - Choose your character",
+  "tsw.slot.empty": "Empty slot - create a new character",
+  "tsw.slot.select": "Select",
+  "tsw.slot.create": "Create",
+  "tsw.slot.skinUrl": "Skin URL",
+  "tsw.slot.slotNumber": "Slot %s",
+  "tsw.slot.save": "Save skin",
+  "tsw.msg.invalidUrl": "Invalid skin URL.",
+  "tsw.msg.characterLoaded": "Character loaded.",
+  "tsw.msg.mustSelect": "You must choose a character before playing."
+}
