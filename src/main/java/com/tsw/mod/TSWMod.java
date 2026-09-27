@@ -80,7 +80,7 @@ public class TSWMod implements ModInitializer {
                 CharacterProfile profile = manager.loadSlot(player.getUuid(), slot);
                 String skinUrl = profile.getSkinUrl();
                 if (skinUrl != null && !skinUrl.isBlank()) {
-                    broadcastSkin(player, skinUrl);
+                    broadcastSkin(player, skinUrl, context.server());
                 }
             });
         });
@@ -98,7 +98,7 @@ public class TSWMod implements ModInitializer {
                 // If they're editing the slot they're currently in, apply immediately.
                 CharacterManager manager = getManager(context.server());
                 if (manager.getActiveSlot(player.getUuid()) == slot) {
-                    broadcastSkin(player, url);
+                    broadcastSkin(player, url, context.server());
                 }
             });
         });
@@ -120,11 +120,11 @@ public class TSWMod implements ModInitializer {
         return trimmed;
     }
 
-    private static void broadcastSkin(ServerPlayerEntity player, String skinUrl) {
+    private static void broadcastSkin(ServerPlayerEntity player, String skinUrl, MinecraftServer server) {
         ACTIVE_SKIN_URLS.put(player.getUuid(), skinUrl);
         TSWNetworking.SkinBroadcastS2C packet = new TSWNetworking.SkinBroadcastS2C(player.getUuid(), skinUrl);
         // Send to everyone (including the owner) so the preview + world render both update.
-        for (ServerPlayerEntity other : PlayerLookup.all(player.getServer())) {
+        for (ServerPlayerEntity other : PlayerLookup.all(server)) {
             ServerPlayNetworking.send(other, packet);
         }
     }
