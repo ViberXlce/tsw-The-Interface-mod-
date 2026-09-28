@@ -123,7 +123,7 @@ public class CharacterManager {
         profile.setPos(player.getX(), player.getY(), player.getZ());
         profile.setRotation(player.getYaw(), player.getPitch());
 
-        World world = player.getWorld();
+        World world = player.getEntityWorld();
         String dimensionId = world.getRegistryKey().getValue().toString();
         profile.setDimension(dimensionId);
 
