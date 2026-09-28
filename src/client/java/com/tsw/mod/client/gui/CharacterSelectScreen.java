@@ -115,7 +115,7 @@ public class CharacterSelectScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
+                context.fill(0, 0, this.width, this.height, 0xC0101010);
 
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
 
