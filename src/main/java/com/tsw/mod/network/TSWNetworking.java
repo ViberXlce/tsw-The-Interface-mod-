@@ -53,7 +53,7 @@ public final class TSWNetworking {
     public record SlotInfo(int slot, boolean occupied, String skinUrl) {
         public static final PacketCodec<RegistryByteBuf, SlotInfo> CODEC = PacketCodec.tuple(
                 PacketCodecs.VAR_INT, SlotInfo::slot,
-                PacketCodecs.BOOL, SlotInfo::occupied,
+                PacketCodecs.BOOLEAN, SlotInfo::occupied,
                 PacketCodecs.STRING, SlotInfo::skinUrl,
                 SlotInfo::new
         );
