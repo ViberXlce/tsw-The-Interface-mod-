@@ -53,7 +53,7 @@ public final class TSWNetworking {
     public record SlotInfo(int slot, boolean occupied, String skinUrl) {
         public static final PacketCodec<RegistryByteBuf, SlotInfo> CODEC = PacketCodec.tuple(
                 PacketCodecs.VAR_INT, SlotInfo::slot,
-                PacketCodecs.BOOLEAN, SlotInfo::occupied,
+                PacketCodecs.BOOL, SlotInfo::occupied,
                 PacketCodecs.STRING, SlotInfo::skinUrl,
                 SlotInfo::new
         );
@@ -95,6 +95,22 @@ public final class TSWNetworking {
     }
 
     // ------------------------------------------------------------------
+    // C2S: player deleted a character slot (wants to start it fresh).
+    // ------------------------------------------------------------------
+    public record DeleteCharacterC2S(int slot) implements CustomPayload {
+        public static final CustomPayload.Id<DeleteCharacterC2S> ID =
+                new CustomPayload.Id<>(Identifier.of(TSWMod.MOD_ID, "delete_character"));
+
+        public static final PacketCodec<RegistryByteBuf, DeleteCharacterC2S> CODEC =
+                PacketCodec.tuple(PacketCodecs.VAR_INT, DeleteCharacterC2S::slot, DeleteCharacterC2S::new);
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // S2C: broadcast to everyone tracking this player that their skin
     // (for the currently active character) changed, so it renders for
     // other players too, not just the owner.
@@ -119,6 +135,7 @@ public final class TSWNetworking {
         PayloadTypeRegistry.playS2C().register(OpenCharacterSelectS2C.ID, OpenCharacterSelectS2C.CODEC);
         PayloadTypeRegistry.playC2S().register(SelectCharacterC2S.ID, SelectCharacterC2S.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdateSkinUrlC2S.ID, UpdateSkinUrlC2S.CODEC);
+        PayloadTypeRegistry.playC2S().register(DeleteCharacterC2S.ID, DeleteCharacterC2S.CODEC);
         PayloadTypeRegistry.playS2C().register(SkinBroadcastS2C.ID, SkinBroadcastS2C.CODEC);
     }
 }

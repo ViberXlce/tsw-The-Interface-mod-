@@ -102,6 +102,15 @@ public class TSWMod implements ModInitializer {
                 }
             });
         });
+
+        // ------------------------------------------------------------
+        // C2S: player deleted a character slot - reset it to fresh/empty.
+        // ------------------------------------------------------------
+        ServerPlayNetworking.registerGlobalReceiver(TSWNetworking.DeleteCharacterC2S.ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            int slot = clampSlot(payload.slot());
+            context.server().execute(() -> getManager(context.server()).deleteSlot(player.getUuid(), slot));
+        });
     }
 
     private static int clampSlot(int slot) {

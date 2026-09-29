@@ -10,7 +10,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.WorldSavePath;
+import net.minecraft.server.WorldSavePath;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
@@ -123,7 +123,7 @@ public class CharacterManager {
         profile.setPos(player.getX(), player.getY(), player.getZ());
         profile.setRotation(player.getYaw(), player.getPitch());
 
-        World world = player.getEntityWorld();
+        World world = player.getWorld();
         String dimensionId = world.getRegistryKey().getValue().toString();
         profile.setDimension(dimensionId);
 
@@ -199,6 +199,11 @@ public class CharacterManager {
             captureLiveStateIntoSlot(player, slot);
         }
         clearActiveSlot(player.getUuid());
+    }
+
+    /** Resets a slot back to a brand new, empty character. */
+    public void deleteSlot(UUID uuid, int slot) {
+        saveSlot(uuid, slot, new CharacterProfile());
     }
 
     public void setSkinUrl(UUID uuid, int slot, String skinUrl) {

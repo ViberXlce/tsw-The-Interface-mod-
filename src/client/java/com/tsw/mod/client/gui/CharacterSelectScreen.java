@@ -14,12 +14,17 @@ import java.util.List;
 /**
  * The screen shown to every player right when they join the server
  * (before they are considered "in the world" for TSW). Shows the 3
- * character slots side by side; each has a live rotating preview of the
- * player model wearing that slot's skin, a text field to type/edit a skin
- * URL, and a Select/Create button.
+ * character slots side by side.
+ *
+ * - An EMPTY slot shows just a big "+" button. Pressing it creates a
+ *   brand new character in that slot and immediately plays as it (no
+ *   skin field is shown until the character actually exists, matching
+ *   the requested "no skin until you choose" flow).
+ * - An OCCUPIED slot shows a live rotating preview of the player model,
+ *   a skin URL field (to change it), a Save button, and a Select button.
  *
  * This screen intentionally cannot be closed with Escape: a character
- * must be chosen before play continues, matching the requested behaviour.
+ * must be chosen before play continues.
  */
 public class CharacterSelectScreen extends Screen {
 
@@ -30,10 +35,7 @@ public class CharacterSelectScreen extends Screen {
 
     private final List<TSWNetworking.SlotInfo> initialSlots;
     private final TextFieldWidget[] urlFields = new TextFieldWidget[SLOT_COUNT];
-    private final String[] previewUrls = new String[SLOT_COUNT];
-
-    /** Slot the local player was previewing before this screen opened, so we can restore it if they back out. */
-    private String previousOwnSkinUrl;
+    private final boolean[] occupiedSlots = new boolean[SLOT_COUNT];
 
     public CharacterSelectScreen(List<TSWNetworking.SlotInfo> initialSlots) {
         super(Text.translatable("tsw.screen.title"));
@@ -42,10 +44,6 @@ public class CharacterSelectScreen extends Screen {
 
     @Override
     protected void init() {
-        if (this.client != null && this.client.player != null) {
-            previousOwnSkinUrl = SkinCache.PLAYER_SKIN_URLS.get(this.client.player.getUuid());
-        }
-
         int totalWidth = SLOT_COUNT * PANEL_WIDTH + (SLOT_COUNT - 1) * PANEL_GAP;
         int startX = (this.width - totalWidth) / 2;
         int panelY = (this.height - PANEL_HEIGHT) / 2;
@@ -55,16 +53,24 @@ public class CharacterSelectScreen extends Screen {
             int panelX = startX + i * (PANEL_WIDTH + PANEL_GAP);
 
             TSWNetworking.SlotInfo info = slot < initialSlots.size() ? initialSlots.get(slot) : null;
-            String existingUrl = info != null ? info.skinUrl() : "";
             boolean occupied = info != null && info.occupied();
-            previewUrls[slot] = existingUrl;
+            occupiedSlots[slot] = occupied;
+
+            if (!occupied) {
+                // Empty slot: only a big "+" button, nothing else.
+                this.addDrawableChild(ButtonWidget.builder(Text.literal("+"), b -> createSlot(slot))
+                        .dimensions(panelX + PANEL_WIDTH / 2 - 25, panelY + PANEL_HEIGHT / 2 - 15, 50, 30)
+                        .build());
+                continue;
+            }
+
+            String existingUrl = info.skinUrl();
 
             TextFieldWidget urlField = new TextFieldWidget(this.textRenderer,
                     panelX + 10, panelY + PANEL_HEIGHT - 60, PANEL_WIDTH - 20, 20,
                     Text.translatable("tsw.slot.skinUrl"));
             urlField.setMaxLength(512);
             urlField.setText(existingUrl == null ? "" : existingUrl);
-            urlField.setChangedListener(text -> onUrlTyped(slot, text));
             urlFields[slot] = urlField;
             this.addDrawableChild(urlField);
 
@@ -72,19 +78,9 @@ public class CharacterSelectScreen extends Screen {
                     .dimensions(panelX + 10, panelY + PANEL_HEIGHT - 34, PANEL_WIDTH - 20, 16)
                     .build());
 
-            Text mainLabel = occupied ? Text.translatable("tsw.slot.select") : Text.translatable("tsw.slot.create");
-            this.addDrawableChild(ButtonWidget.builder(mainLabel, b -> selectSlot(slot))
+            this.addDrawableChild(ButtonWidget.builder(Text.translatable("tsw.slot.select"), b -> selectSlot(slot))
                     .dimensions(panelX + 10, panelY + PANEL_HEIGHT - 12, PANEL_WIDTH - 20, 20)
                     .build());
-        }
-    }
-
-    private void onUrlTyped(int slot, String text) {
-        previewUrls[slot] = text;
-        // Live-preview on the local player entity only while this screen is open.
-        if (this.client != null && this.client.player != null) {
-            SkinCache.PLAYER_SKIN_URLS.put(this.client.player.getUuid(), text);
-            SkinCache.getOrRequest(text);
         }
     }
 
@@ -94,17 +90,15 @@ public class CharacterSelectScreen extends Screen {
     }
 
     private void selectSlot(int slot) {
-        // Make sure whatever URL is currently typed is saved before switching in.
         saveSkin(slot);
         ClientPlayNetworking.send(new TSWNetworking.SelectCharacterC2S(slot));
         this.close();
     }
 
-    @Override
-    public void close() {
-        // Real skin state will arrive shortly via the server's SkinBroadcastS2C
-        // once selection is processed; nothing else to restore here.
-        super.close();
+    private void createSlot(int slot) {
+        // A fresh character: nothing to save yet, just claim the slot and play.
+        ClientPlayNetworking.send(new TSWNetworking.SelectCharacterC2S(slot));
+        this.close();
     }
 
     @Override
@@ -115,9 +109,16 @@ public class CharacterSelectScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-                context.fill(0, 0, this.width, this.height, 0xC0101010);
+        // Plain dark overlay instead of Screen#renderBackground: recent
+        // versions only allow one background-blur call per frame, and
+        // this screen does not need the blur effect anyway.
+        context.fill(0, 0, this.width, this.height, 0xF0101018);
 
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 20, 0xFFFFFF);
+        // "TSW" wordmark, drawn twice with a 1px offset for a cheap bold look.
+        int titleY = 34;
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("TSW").formatted(net.minecraft.util.Formatting.LIGHT_PURPLE), this.width / 2 + 1, titleY, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("TSW").formatted(net.minecraft.util.Formatting.LIGHT_PURPLE), this.width / 2, titleY, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, titleY + 14, 0xA0A0A0);
 
         int totalWidth = SLOT_COUNT * PANEL_WIDTH + (SLOT_COUNT - 1) * PANEL_GAP;
         int startX = (this.width - totalWidth) / 2;
@@ -125,41 +126,41 @@ public class CharacterSelectScreen extends Screen {
 
         for (int i = 0; i < SLOT_COUNT; i++) {
             int panelX = startX + i * (PANEL_WIDTH + PANEL_GAP);
-            context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0x88000000);
+            context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0x902A2A38);
+            context.drawBorder(panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, 0x60FFFFFF);
+
             context.drawCenteredTextWithShadow(this.textRenderer,
                     Text.translatable("tsw.slot.slotNumber", i + 1),
-                    panelX + PANEL_WIDTH / 2, panelY + 6, 0xFFFFFF);
+                    panelX + PANEL_WIDTH / 2, panelY + 8, 0xFFFFFF);
 
-            renderRotatingPreview(context, panelX, panelY, mouseX, mouseY);
+            if (occupiedSlots[i]) {
+                renderRotatingPreview(context, panelX, panelY);
+            }
+            // Empty slots draw nothing extra here - the "+" button (added
+            // in init()) already sits centered in the panel.
         }
 
         super.render(context, mouseX, mouseY, delta);
     }
 
     /**
-     * Draws the local player's model (which, thanks to the live preview
-     * hook in onUrlTyped, is currently wearing whatever skin URL is typed
-     * for this slot) rotating slowly inside the panel.
+     * Draws the local player's model rotating slowly inside an occupied
+     * slot's panel.
      *
      * MAPPING NOTE: `InventoryScreen.drawEntity(...)` is the same static
      * helper vanilla itself uses to render the player inside the
-     * survival-inventory background. Its exact parameter list has shifted
-     * slightly between minor MC versions (extra float for scale, or a
-     * consumer for rotation) - if this line does not compile against your
-     * 1.21.11 mappings, open InventoryScreen in your IDE, copy the
-     * up-to-date signature, and adjust this single call; nothing else in
-     * the screen needs to change.
+     * survival-inventory background. If its parameter list does not
+     * match your exact 1.21.11 mappings, open InventoryScreen in your
+     * IDE, copy the up-to-date signature, and adjust this single call.
      */
-    private void renderRotatingPreview(DrawContext context, int panelX, int panelY, int mouseX, int mouseY) {
+    private void renderRotatingPreview(DrawContext context, int panelX, int panelY) {
         if (this.client == null || this.client.player == null) {
             return;
         }
         int previewX0 = panelX + 20;
-        int previewY0 = panelY + 30;
+        int previewY0 = panelY + 26;
         int previewX1 = panelX + PANEL_WIDTH - 20;
         int previewY1 = panelY + PANEL_HEIGHT - 70;
-
-        float rotationYaw = (System.currentTimeMillis() % 4000L) / 4000f * 360f;
 
         net.minecraft.client.gui.screen.ingame.InventoryScreen.drawEntity(
                 context,

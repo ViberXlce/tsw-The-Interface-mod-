@@ -3,7 +3,9 @@
   "package": "com.tsw.mod.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
-  "client": [],
+  "client": [
+    "AbstractClientPlayerEntityMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
