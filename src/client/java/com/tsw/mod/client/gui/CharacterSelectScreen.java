@@ -127,7 +127,13 @@ public class CharacterSelectScreen extends Screen {
         for (int i = 0; i < SLOT_COUNT; i++) {
             int panelX = startX + i * (PANEL_WIDTH + PANEL_GAP);
             context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0x902A2A38);
-            context.drawBorder(panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, 0x60FFFFFF);
+            // Manual 1px border (avoids DrawContext#drawBorder, whose
+            // signature has shifted across versions): top, bottom, left, right.
+            int borderColor = 0x60FFFFFF;
+            context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + 1, borderColor);
+            context.fill(panelX, panelY + PANEL_HEIGHT - 1, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, borderColor);
+            context.fill(panelX, panelY, panelX + 1, panelY + PANEL_HEIGHT, borderColor);
+            context.fill(panelX + PANEL_WIDTH - 1, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, borderColor);
 
             context.drawCenteredTextWithShadow(this.textRenderer,
                     Text.translatable("tsw.slot.slotNumber", i + 1),
