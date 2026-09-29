@@ -10,7 +10,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.WorldSavePath;
+import net.minecraft.util.WorldSavePath;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
@@ -123,7 +123,7 @@ public class CharacterManager {
         profile.setPos(player.getX(), player.getY(), player.getZ());
         profile.setRotation(player.getYaw(), player.getPitch());
 
-        World world = player.getWorld();
+        World world = player.getEntityWorld();
         String dimensionId = world.getRegistryKey().getValue().toString();
         profile.setDimension(dimensionId);
 
