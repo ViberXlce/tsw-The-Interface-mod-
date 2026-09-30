@@ -1,10 +1,10 @@
 package com.tsw.mod.client.gui;
 
-import com.tsw.mod.client.skin.SkinCache;
 import com.tsw.mod.network.TSWNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
@@ -13,80 +13,120 @@ import java.util.List;
 
 /**
  * The screen shown to every player right when they join the server
- * (before they are considered "in the world" for TSW). Shows the 3
- * character slots side by side.
+ * (before they are considered "in the world" for TSW).
  *
- * - An EMPTY slot shows just a big "+" button. Pressing it creates a
- *   brand new character in that slot and immediately plays as it (no
- *   skin field is shown until the character actually exists, matching
- *   the requested "no skin until you choose" flow).
- * - An OCCUPIED slot shows a live rotating preview of the player model,
- *   a skin URL field (to change it), a Save button, and a Select button.
- *
+ * Layout: one large "focused" character shown centered with a big
+ * rotating preview and a big Play/Create button, and the other two
+ * slots shown as small side thumbnails you click to switch focus.
  * This screen intentionally cannot be closed with Escape: a character
  * must be chosen before play continues.
  */
 public class CharacterSelectScreen extends Screen {
 
     private static final int SLOT_COUNT = 3;
-    private static final int PANEL_WIDTH = 150;
-    private static final int PANEL_HEIGHT = 200;
-    private static final int PANEL_GAP = 20;
 
-    private final List<TSWNetworking.SlotInfo> initialSlots;
-    private final TextFieldWidget[] urlFields = new TextFieldWidget[SLOT_COUNT];
-    private final boolean[] occupiedSlots = new boolean[SLOT_COUNT];
+    private static final int CENTER_WIDTH = 260;
+    private static final int CENTER_HEIGHT = 300;
+    private static final int THUMB_WIDTH = 90;
+    private static final int THUMB_HEIGHT = 140;
+    private static final int GAP = 24;
+
+    private final List<TSWNetworking.SlotInfo> slots;
+    private final boolean[] occupied = new boolean[SLOT_COUNT];
+    private TextFieldWidget skinField;
+
+    /** Which slot is currently shown big in the middle. */
+    private int focusedSlot;
 
     public CharacterSelectScreen(List<TSWNetworking.SlotInfo> initialSlots) {
         super(Text.translatable("tsw.screen.title"));
-        this.initialSlots = initialSlots;
+        this.slots = initialSlots;
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            TSWNetworking.SlotInfo info = i < initialSlots.size() ? initialSlots.get(i) : null;
+            occupied[i] = info != null && info.occupied();
+        }
+        // Start focused on the first occupied slot, or slot 0 if all empty.
+        this.focusedSlot = 0;
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            if (occupied[i]) {
+                this.focusedSlot = i;
+                break;
+            }
+        }
+    }
+
+    private String skinUrlOf(int slot) {
+        TSWNetworking.SlotInfo info = slot < slots.size() ? slots.get(slot) : null;
+        return info != null ? info.skinUrl() : "";
     }
 
     @Override
     protected void init() {
-        int totalWidth = SLOT_COUNT * PANEL_WIDTH + (SLOT_COUNT - 1) * PANEL_GAP;
-        int startX = (this.width - totalWidth) / 2;
-        int panelY = (this.height - PANEL_HEIGHT) / 2;
+        rebuildWidgets();
+    }
 
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            int slot = i;
-            int panelX = startX + i * (PANEL_WIDTH + PANEL_GAP);
+    private void rebuildWidgets() {
+        this.clearChildren();
 
-            TSWNetworking.SlotInfo info = slot < initialSlots.size() ? initialSlots.get(slot) : null;
-            boolean occupied = info != null && info.occupied();
-            occupiedSlots[slot] = occupied;
+        int centerX = (this.width - CENTER_WIDTH) / 2;
+        int centerY = (this.height - CENTER_HEIGHT) / 2;
 
-            if (!occupied) {
-                // Empty slot: only a big "+" button, nothing else.
-                this.addDrawableChild(ButtonWidget.builder(Text.literal("+"), b -> createSlot(slot))
-                        .dimensions(panelX + PANEL_WIDTH / 2 - 25, panelY + PANEL_HEIGHT / 2 - 15, 50, 30)
-                        .build());
-                continue;
-            }
-
-            String existingUrl = info.skinUrl();
-
-            TextFieldWidget urlField = new TextFieldWidget(this.textRenderer,
-                    panelX + 10, panelY + PANEL_HEIGHT - 60, PANEL_WIDTH - 20, 20,
+        // ---- Center (focused) slot ----
+        if (occupied[focusedSlot]) {
+            skinField = new TextFieldWidget(this.textRenderer,
+                    centerX + 20, centerY + CENTER_HEIGHT - 78, CENTER_WIDTH - 40, 20,
                     Text.translatable("tsw.slot.skinUrl"));
-            urlField.setMaxLength(512);
-            urlField.setText(existingUrl == null ? "" : existingUrl);
-            urlFields[slot] = urlField;
-            this.addDrawableChild(urlField);
+            skinField.setMaxLength(512);
+            skinField.setText(skinUrlOf(focusedSlot));
+            this.addDrawableChild(skinField);
 
-            this.addDrawableChild(ButtonWidget.builder(Text.translatable("tsw.slot.save"), b -> saveSkin(slot))
-                    .dimensions(panelX + 10, panelY + PANEL_HEIGHT - 34, PANEL_WIDTH - 20, 16)
+            this.addDrawableChild(ButtonWidget.builder(Text.translatable("tsw.slot.save"), b -> saveSkin(focusedSlot))
+                    .dimensions(centerX + 20, centerY + CENTER_HEIGHT - 52, CENTER_WIDTH - 40, 16)
                     .build());
 
-            this.addDrawableChild(ButtonWidget.builder(Text.translatable("tsw.slot.select"), b -> selectSlot(slot))
-                    .dimensions(panelX + 10, panelY + PANEL_HEIGHT - 12, PANEL_WIDTH - 20, 20)
+            this.addDrawableChild(ButtonWidget.builder(Text.translatable("tsw.slot.select"), b -> selectSlot(focusedSlot))
+                    .dimensions(centerX + 20, centerY + CENTER_HEIGHT - 30, CENTER_WIDTH - 40, 24)
+                    .build());
+        } else {
+            skinField = null;
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("+"), b -> createSlot(focusedSlot))
+                    .dimensions(centerX + CENTER_WIDTH / 2 - 30, centerY + CENTER_HEIGHT - 40, 60, 30)
                     .build());
         }
+
+        // ---- Side thumbnails (the other two slots) ----
+        int leftSlot = Math.floorMod(focusedSlot - 1, SLOT_COUNT);
+        int rightSlot = Math.floorMod(focusedSlot + 1, SLOT_COUNT);
+
+        int leftX = centerX - GAP - THUMB_WIDTH;
+        int rightX = centerX + CENTER_WIDTH + GAP;
+        int thumbY = centerY + (CENTER_HEIGHT - THUMB_HEIGHT) / 2;
+
+        Text leftLabel = occupied[leftSlot]
+                ? Text.translatable("tsw.slot.slotNumber", leftSlot + 1)
+                : Text.literal("+");
+        this.addDrawableChild(ButtonWidget.builder(leftLabel, b -> focusSlot(leftSlot))
+                .dimensions(leftX, thumbY + THUMB_HEIGHT - 24, THUMB_WIDTH, 20)
+                .build());
+
+        Text rightLabel = occupied[rightSlot]
+                ? Text.translatable("tsw.slot.slotNumber", rightSlot + 1)
+                : Text.literal("+");
+        this.addDrawableChild(ButtonWidget.builder(rightLabel, b -> focusSlot(rightSlot))
+                .dimensions(rightX, thumbY + THUMB_HEIGHT - 24, THUMB_WIDTH, 20)
+                .build());
+    }
+
+    private void focusSlot(int slot) {
+        this.focusedSlot = slot;
+        rebuildWidgets();
     }
 
     private void saveSkin(int slot) {
-        String url = urlFields[slot].getText();
-        ClientPlayNetworking.send(new TSWNetworking.UpdateSkinUrlC2S(slot, url));
+        if (skinField == null) {
+            return;
+        }
+        ClientPlayNetworking.send(new TSWNetworking.UpdateSkinUrlC2S(slot, skinField.getText()));
     }
 
     private void selectSlot(int slot) {
@@ -96,62 +136,104 @@ public class CharacterSelectScreen extends Screen {
     }
 
     private void createSlot(int slot) {
-        // A fresh character: nothing to save yet, just claim the slot and play.
         ClientPlayNetworking.send(new TSWNetworking.SelectCharacterC2S(slot));
         this.close();
     }
 
     @Override
     public boolean shouldCloseOnEsc() {
-        // A character must be chosen before returning to normal play.
         return false;
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Plain dark overlay instead of Screen#renderBackground: recent
-        // versions only allow one background-blur call per frame, and
-        // this screen does not need the blur effect anyway.
-        context.fill(0, 0, this.width, this.height, 0xF0101018);
+        renderAnimatedBackground(context);
 
-        // "TSW" wordmark, drawn twice with a 1px offset for a cheap bold look.
-        int titleY = 34;
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("TSW").formatted(net.minecraft.util.Formatting.LIGHT_PURPLE), this.width / 2 + 1, titleY, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("TSW").formatted(net.minecraft.util.Formatting.LIGHT_PURPLE), this.width / 2, titleY, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, titleY + 14, 0xA0A0A0);
+        // "TSW" logo, top-left corner (matches a typical top-left wordmark).
+        context.drawTextWithShadow(this.textRenderer, Text.literal("TSW"), 16, 14, 0xD9B8FF);
+        context.drawTextWithShadow(this.textRenderer, this.title, 16, 26, 0x9090A0);
 
-        int totalWidth = SLOT_COUNT * PANEL_WIDTH + (SLOT_COUNT - 1) * PANEL_GAP;
-        int startX = (this.width - totalWidth) / 2;
-        int panelY = (this.height - PANEL_HEIGHT) / 2;
+        int centerX = (this.width - CENTER_WIDTH) / 2;
+        int centerY = (this.height - CENTER_HEIGHT) / 2;
 
-        for (int i = 0; i < SLOT_COUNT; i++) {
-            int panelX = startX + i * (PANEL_WIDTH + PANEL_GAP);
-            context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0x902A2A38);
-            // Manual 1px border (avoids DrawContext#drawBorder, whose
-            // signature has shifted across versions): top, bottom, left, right.
-            int borderColor = 0x60FFFFFF;
-            context.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + 1, borderColor);
-            context.fill(panelX, panelY + PANEL_HEIGHT - 1, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, borderColor);
-            context.fill(panelX, panelY, panelX + 1, panelY + PANEL_HEIGHT, borderColor);
-            context.fill(panelX + PANEL_WIDTH - 1, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, borderColor);
+        drawPanel(context, centerX, centerY, CENTER_WIDTH, CENTER_HEIGHT, 0xA02A2A40);
 
+        if (occupied[focusedSlot]) {
+            renderPreview(context, centerX + 20, centerY + 16, centerX + CENTER_WIDTH - 20, centerY + CENTER_HEIGHT - 110, 45);
             context.drawCenteredTextWithShadow(this.textRenderer,
-                    Text.translatable("tsw.slot.slotNumber", i + 1),
-                    panelX + PANEL_WIDTH / 2, panelY + 8, 0xFFFFFF);
-
-            if (occupiedSlots[i]) {
-                renderRotatingPreview(context, panelX, panelY);
-            }
-            // Empty slots draw nothing extra here - the "+" button (added
-            // in init()) already sits centered in the panel.
+                    Text.translatable("tsw.slot.slotNumber", focusedSlot + 1),
+                    centerX + CENTER_WIDTH / 2, centerY + CENTER_HEIGHT - 100, 0xFFFFFF);
+        } else {
+            context.drawCenteredTextWithShadow(this.textRenderer,
+                    Text.translatable("tsw.slot.empty"),
+                    centerX + CENTER_WIDTH / 2, centerY + CENTER_HEIGHT / 2 - 40, 0xB0B0B0);
         }
+
+        int leftSlot = Math.floorMod(focusedSlot - 1, SLOT_COUNT);
+        int rightSlot = Math.floorMod(focusedSlot + 1, SLOT_COUNT);
+        int leftX = centerX - GAP - THUMB_WIDTH;
+        int rightX = centerX + CENTER_WIDTH + GAP;
+        int thumbY = centerY + (CENTER_HEIGHT - THUMB_HEIGHT) / 2;
+
+        drawPanel(context, leftX, thumbY, THUMB_WIDTH, THUMB_HEIGHT, 0x702A2A40);
+        drawPanel(context, rightX, thumbY, THUMB_WIDTH, THUMB_HEIGHT, 0x702A2A40);
+
+        if (occupied[leftSlot]) {
+            renderPreview(context, leftX + 10, thumbY + 8, leftX + THUMB_WIDTH - 10, thumbY + THUMB_HEIGHT - 30, 20);
+        }
+        if (occupied[rightSlot]) {
+            renderPreview(context, rightX + 10, thumbY + 8, rightX + THUMB_WIDTH - 10, thumbY + THUMB_HEIGHT - 30, 20);
+        }
+
+        int occupiedCount = 0;
+        for (boolean b : occupied) {
+            if (b) occupiedCount++;
+        }
+        context.drawCenteredTextWithShadow(this.textRenderer,
+                Text.literal(occupiedCount + " / " + SLOT_COUNT),
+                this.width / 2, centerY + CENTER_HEIGHT + 14, 0x9090A0);
 
         super.render(context, mouseX, mouseY, delta);
     }
 
+    private void drawPanel(DrawContext context, int x, int y, int w, int h, int fillColor) {
+        context.fill(x, y, x + w, y + h, fillColor);
+        int border = 0x50FFFFFF;
+        context.fill(x, y, x + w, y + 1, border);
+        context.fill(x, y + h - 1, x + w, y + h, border);
+        context.fill(x, y, x + 1, y + h, border);
+        context.fill(x + w - 1, y, x + w, y + h, border);
+    }
+
     /**
-     * Draws the local player's model rotating slowly inside an occupied
-     * slot's panel.
+     * A dark purple-to-black gradient with a handful of small dots
+     * slowly drifting upward, to give the screen some life without
+     * needing any external image assets. Uses only DrawContext#fill /
+     * #fillGradient, which have been stable across Minecraft versions
+     * for a very long time.
+     */
+    private void renderAnimatedBackground(DrawContext context) {
+        context.fillGradient(0, 0, this.width, this.height, 0xFF1A0B2E, 0xFF05030A);
+
+        long now = System.currentTimeMillis();
+        int dotCount = 40;
+        for (int i = 0; i < dotCount; i++) {
+            float seed = i * 12.9898f;
+            float baseX = (float) ((Math.sin(seed) * 0.5 + 0.5) * this.width);
+            float speed = 10f + (i % 5) * 4f;
+            float loopHeight = this.height + 60f;
+            float y = loopHeight - ((now / 1000f * speed + i * 53f) % loopHeight);
+            float drift = (float) Math.sin(now / 1000.0 + i) * 8f;
+            int x = (int) (baseX + drift);
+            int size = 1 + (i % 3);
+            int alpha = 0x30 + (i % 4) * 0x18;
+            int color = (alpha << 24) | 0xC9A6FF;
+            context.fill(x, (int) y, x + size, (int) y + size, color);
+        }
+    }
+
+    /**
+     * Draws the local player's model rotating slowly inside the given box.
      *
      * MAPPING NOTE: `InventoryScreen.drawEntity(...)` is the same static
      * helper vanilla itself uses to render the player inside the
@@ -159,22 +241,17 @@ public class CharacterSelectScreen extends Screen {
      * match your exact 1.21.11 mappings, open InventoryScreen in your
      * IDE, copy the up-to-date signature, and adjust this single call.
      */
-    private void renderRotatingPreview(DrawContext context, int panelX, int panelY) {
+    private void renderPreview(DrawContext context, int x0, int y0, int x1, int y1, int scale) {
         if (this.client == null || this.client.player == null) {
             return;
         }
-        int previewX0 = panelX + 20;
-        int previewY0 = panelY + 26;
-        int previewX1 = panelX + PANEL_WIDTH - 20;
-        int previewY1 = panelY + PANEL_HEIGHT - 70;
-
-        net.minecraft.client.gui.screen.ingame.InventoryScreen.drawEntity(
+        InventoryScreen.drawEntity(
                 context,
-                previewX0, previewY0, previewX1, previewY1,
-                30,
+                x0, y0, x1, y1,
+                scale,
                 0.0f,
-                previewX0 + (previewX1 - previewX0) / 2f,
-                previewY0 + (previewY1 - previewY0) / 2f,
+                x0 + (x1 - x0) / 2f,
+                y0 + (y1 - y0) / 2f,
                 this.client.player
         );
     }
