@@ -231,21 +231,57 @@ public class CharacterSelectScreen extends Screen {
      * for a very long time.
      */
     private void renderAnimatedBackground(DrawContext context) {
-        context.fillGradient(0, 0, this.width, this.height, 0xFF1A0B2E, 0xFF05030A);
+        // Base gradient.
+        context.fillGradient(0, 0, this.width, this.height, 0xFF160A28, 0xFF04020A);
 
         long now = System.currentTimeMillis();
-        int dotCount = 40;
+
+        // Slowly drifting "aurora" bands: a few wide, very transparent
+        // horizontal strips whose horizontal offset and tint shift over
+        // time, layered on top of the base gradient.
+        int bandCount = 4;
+        for (int b = 0; b < bandCount; b++) {
+            double t = now / 1000.0;
+            float bandY = this.height * (0.15f + b * 0.2f);
+            float bandHeight = this.height * 0.22f;
+            float xOffset = (float) Math.sin(t * 0.3 + b * 1.7) * this.width * 0.15f;
+            int[] hues = {0xFF6A3CB5, 0xFF3C6AB5, 0xFFB53C8E, 0xFF3CB5A6};
+            int bandColor = (0x1C << 24) | (hues[b % hues.length] & 0xFFFFFF);
+            int bandX0 = (int) (-this.width * 0.3f + xOffset);
+            int bandX1 = (int) (this.width * 1.3f + xOffset);
+            context.fillGradient(bandX0, (int) bandY, bandX1, (int) (bandY + bandHeight), bandColor, 0x00000000);
+        }
+
+        // Soft glow centered behind the focused character: several
+        // overlapping low-alpha rectangles, each a bit smaller than the
+        // last, to fake a radial spotlight without needing a real
+        // circular/gradient texture.
+        int centerX = this.width / 2;
+        int glowCenterY = (int) (this.height * 0.42);
+        int rings = 6;
+        for (int r = rings; r >= 1; r--) {
+            int w = r * 36;
+            int h = r * 44;
+            int alpha = 0x08 + (rings - r) * 0x03;
+            int color = (alpha << 24) | 0xC9A6FF;
+            context.fill(centerX - w, glowCenterY - h, centerX + w, glowCenterY + h, color);
+        }
+
+        // Twinkling starfield: small dots that both drift upward and
+        // pulse in brightness.
+        int dotCount = 50;
         for (int i = 0; i < dotCount; i++) {
             float seed = i * 12.9898f;
             float baseX = (float) ((Math.sin(seed) * 0.5 + 0.5) * this.width);
-            float speed = 10f + (i % 5) * 4f;
+            float speed = 6f + (i % 5) * 3f;
             float loopHeight = this.height + 60f;
             float y = loopHeight - ((now / 1000f * speed + i * 53f) % loopHeight);
-            float drift = (float) Math.sin(now / 1000.0 + i) * 8f;
+            float drift = (float) Math.sin(now / 1200.0 + i) * 6f;
             int x = (int) (baseX + drift);
             int size = 1 + (i % 3);
-            int alpha = 0x30 + (i % 4) * 0x18;
-            int color = (alpha << 24) | 0xC9A6FF;
+            float twinkle = (float) (0.5 + 0.5 * Math.sin(now / 400.0 + i * 2.1));
+            int alpha = (int) (0x20 + twinkle * 0x60);
+            int color = (alpha << 24) | 0xE6D9FF;
             context.fill(x, (int) y, x + size, (int) y + size, color);
         }
     }
