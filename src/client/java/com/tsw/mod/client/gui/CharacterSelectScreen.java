@@ -159,10 +159,18 @@ public class CharacterSelectScreen extends Screen {
         drawPanel(context, centerX, centerY, CENTER_WIDTH, CENTER_HEIGHT, 0xA02A2A40);
 
         if (occupied[focusedSlot]) {
-            renderPreview(context, centerX + 20, centerY + 16, centerX + CENTER_WIDTH - 20, centerY + CENTER_HEIGHT - 110, 45);
+            renderPreview(context, centerX + 20, centerY + 16, centerX + CENTER_WIDTH - 20, centerY + CENTER_HEIGHT - 128, 45);
+
             context.drawCenteredTextWithShadow(this.textRenderer,
-                    Text.translatable("tsw.slot.slotNumber", focusedSlot + 1),
-                    centerX + CENTER_WIDTH / 2, centerY + CENTER_HEIGHT - 100, 0xFFFFFF);
+                    Text.translatable("tsw.slot.slotNumber", focusedSlot + 1).formatted(net.minecraft.util.Formatting.GOLD),
+                    centerX + CENTER_WIDTH / 2, centerY + CENTER_HEIGHT - 122, 0xFFAA55);
+
+            String playerName = this.client != null && this.client.player != null
+                    ? this.client.player.getName().getString()
+                    : "";
+            context.drawCenteredTextWithShadow(this.textRenderer,
+                    Text.literal(playerName.toUpperCase()),
+                    centerX + CENTER_WIDTH / 2, centerY + CENTER_HEIGHT - 110, 0xFFFFFF);
         } else {
             context.drawCenteredTextWithShadow(this.textRenderer,
                     Text.translatable("tsw.slot.empty"),
@@ -183,6 +191,16 @@ public class CharacterSelectScreen extends Screen {
         }
         if (occupied[rightSlot]) {
             renderPreview(context, rightX + 10, thumbY + 8, rightX + THUMB_WIDTH - 10, thumbY + THUMB_HEIGHT - 30, 20);
+        }
+
+        if (occupied[focusedSlot]) {
+            // Orange glow behind the Select/Play button (drawn before the
+            // button itself so it peeks out as a border).
+            int bx = centerX + 20;
+            int by = centerY + CENTER_HEIGHT - 30;
+            int bw = CENTER_WIDTH - 40;
+            int bh = 24;
+            context.fill(bx - 3, by - 3, bx + bw + 3, by + bh + 3, 0xFFFF8C1A);
         }
 
         int occupiedCount = 0;
